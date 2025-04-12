@@ -1,13 +1,13 @@
 const mongoose = require("mongoose");
 
 const resumeSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true },
-  skills: { type: String, required: true },
-  filePath: { type: String, required: true },
-  uploadedAt: { type: Date, default: Date.now }
+  name: String,
+  email: String,
+  skills: String,
+  filePath: String,
 });
 
-const Resume = mongoose.model("Resume", resumeSchema);
+// ✅ Fix for OverwriteModelError
+const Resume = mongoose.models.Resume || mongoose.model("Resume", resumeSchema);
 
 module.exports = Resume;
