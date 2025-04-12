@@ -6,7 +6,7 @@ const bodyParser = require("body-parser");
 const multer = require("multer");
 const fs = require("fs");
 const pdfParse = require("pdf-parse");
-
+const matchResumeRoutes = require('./routes/matchResumeRoutes');
 dotenv.config();
 const app = express();
 
@@ -28,7 +28,6 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + "-" + file.originalname);
   },
 });
-
 const upload = multer({ storage });
 
 // Resume Schema
@@ -38,28 +37,9 @@ const resumeSchema = new mongoose.Schema({
   skills: String,
   filePath: String,
 });
-
 const Resume = mongoose.models.Resume || mongoose.model("Resume", resumeSchema);
 
-// ✅ Resume Parse Route - moved outside
-app.post("/api/test-resume-parse", async (req, res) => {
-  const resumePath = req.body.resumePath;
-
-  if (!resumePath) {
-    return res.status(400).json({ error: "resumePath is required in request body" });
-  }
-
-  try {
-    const pdfBuffer = fs.readFileSync(resumePath);
-    const data = await pdfParse(pdfBuffer);
-    res.json({ extractedText: data.text });
-  } catch (err) {
-    console.error("Error parsing resume:", err);
-    res.status(500).json({ error: "Failed to parse resume" });
-  }
-});
-
-// Resume Upload Route
+// 🟢 Route: Resume Upload
 app.post("/api/resumes/upload", upload.single("file"), (req, res) => {
   if (!req.file) {
     return res.status(400).send("No file uploaded.");
@@ -78,6 +58,43 @@ app.post("/api/resumes/upload", upload.single("file"), (req, res) => {
     .catch((err) => res.status(500).send("Error storing resume in DB: " + err));
 });
 
+// 🟢 Route: Test Resume Parsing
+app.post("/api/test-resume-parse", async (req, res) => {
+  const resumePath = req.body.resumePath;
+  if (!resumePath) {
+    return res.status(400).json({ error: "resumePath is required in request body" });
+  }
+
+  try {
+    const pdfBuffer = fs.readFileSync(resumePath);
+    const data = await pdfParse(pdfBuffer);
+    res.json({ extractedText: data.text });
+  } catch (err) {
+    console.error("Error parsing resume:", err);
+    res.status(500).json({ error: "Failed to parse resume" });
+  }
+});
+
+// 🟢 Route: JD Input Test
+app.post("/api/jd-input", (req, res) => {
+  const { jdText } = req.body;
+  if (!jdText) {
+    return res.status(400).json({ message: "Job description is required." });
+  }
+
+  res.status(200).json({ message: "JD received successfully", jd: jdText });
+});
+
+// 🟢 Route: Resume Matching (using TF-IDF + Cosine Similarity)
+const matchResumesRoute = require("./routes/matchResumeRoutes");
+app.use('/api', matchResumeRoutes); 
+
+// Global error handler (should be at the bottom)
+app.use((err, req, res, next) => {
+  console.error('Error Message:', err.message);  // Log the error message
+  console.error('Error Stack:', err.stack);      // Log the error stack trace
+  res.status(500).json({ error: 'Something went wrong!' });  // Send a response to the client
+});
 // Server Port
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
